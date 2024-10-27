@@ -1,10 +1,9 @@
 const std = @import("std");
-const lexer = @import("./lexer.zig");
+const Lexer = @import("./Lexer.zig");
 const Token = @import("./Token.zig");
-
-const Parser = @import("./parser.zig").Parser;
 const Executor = @import("./executor.zig").Executor;
-const Lexer = lexer.Lexer;
+const Parser = @import("./Parser.zig");
+const ParserError = Parser.ParserError;
 
 pub fn main() !void {
     const allocator = std.heap.c_allocator;
@@ -27,7 +26,7 @@ pub fn main() !void {
             // the number of bytes written (if memory serves)
             const number_of_bytes = try stdin.read(&buf);
 
-            var l = Lexer{ .current = 0, .source = &buf };
+            var l = Lexer{ .current = 0, .source = &buf, .allocator = allocator };
 
             // Check the input length
             // considering the buffer size
@@ -36,15 +35,10 @@ pub fn main() !void {
                 continue;
             }
 
-            var tokens = std.ArrayList(Token).init(allocator);
-            while (true) {
-                const tok = l.next();
-                if (tok.tag == Token.Tag.Eol) break;
-                try tokens.append(tok);
-            }
+            const tokens = try l.tokenize();
 
             var parser = Parser.init(allocator, tokens.items);
-            const expr = try parser.parseLine();
+            const expr = parser.parseLine() catch continue;
 
             var executor = Executor.init(allocator, expr, stdout.any(), stdin.any());
             const value = try executor.execute();

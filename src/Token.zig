@@ -39,6 +39,7 @@ pub const OpType = enum(u8) {
 pub const Tag = union(enum) {
     Number: struct { val: i64 },
     String: struct { val: []const u8 },
+    Invalid: struct { val: []const u8 },
 
     Op: OpType,
 
@@ -47,7 +48,19 @@ pub const Tag = union(enum) {
 
     Eof,
     Eol,
-    Invalid,
+
+    pub fn toString(self: Tag, allocator: std.mem.Allocator) std.fmt.AllocPrintError![]u8 {
+        return switch (self) {
+            .Number => |num| std.fmt.allocPrint(allocator, "{d}", .{num.val}),
+            .String => |str| std.fmt.allocPrint(allocator, "{s}", .{str.val}),
+            .Invalid => |inv| std.fmt.allocPrint(allocator, "{s}", .{inv.val}),
+            .Op => |op| std.fmt.allocPrint(allocator, "{s}", .{op.toString()}),
+            .RightParen => std.fmt.allocPrint(allocator, ")", .{}),
+            .LeftParen => std.fmt.allocPrint(allocator, "(", .{}),
+            .Eof => std.fmt.allocPrint(allocator, "eof", .{}),
+            .Eol => std.fmt.allocPrint(allocator, "\n", .{}),
+        };
+    }
 };
 
 pub const Location = struct { start: u32, end: u32 };

@@ -1,4 +1,3 @@
-const lexer = @import("./lexer.zig");
 const std = @import("std");
 const Token = @import("./Token.zig");
 
