@@ -60,7 +60,6 @@ pub const Executor = struct {
             },
 
             .Ternary => |ternary| {
-                std.debug.print("{s}\n", .{try node.toString(self.allocator)});
                 return switch (try self.executeExpr(ternary.cond)) {
                     .Boolean => |boolean| self.executeExpr(if (boolean) ternary.tru else ternary.fals),
 
