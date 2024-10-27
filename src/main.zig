@@ -41,7 +41,7 @@ pub fn main() !void {
             const expr = parser.parseLine() catch continue;
 
             var executor = Executor.init(allocator, expr, stdout.any(), stdin.any());
-            const value = try executor.execute();
+            const value = executor.execute() catch continue;
             try stdout.print("{s}\n", .{try value.toString(allocator)});
         }
     }

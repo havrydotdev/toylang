@@ -15,6 +15,11 @@ pub const RuntimeValue = union(enum) {
     }
 };
 
+pub const RuntimeError = error{
+    UnknownOp,
+    InvalidType,
+} || std.fmt.AllocPrintError;
+
 pub const Executor = struct {
     allocator: std.mem.Allocator,
     node: *Expr,
@@ -34,20 +39,15 @@ pub const Executor = struct {
         self.node.deinit(self.allocator);
     }
 
-    pub fn execute(self: *Executor) std.fmt.AllocPrintError!RuntimeValue {
+    pub fn execute(self: *Executor) RuntimeError!RuntimeValue {
         return self.executeExpr(self.node);
     }
 
-    fn executeExpr(self: *Executor, node: *const Expr) std.fmt.AllocPrintError!RuntimeValue {
+    fn executeExpr(self: *Executor, node: *const Expr) RuntimeError!RuntimeValue {
         switch (node.*) {
             .Number => |num| return .{ .Number = @as(f64, @floatFromInt(num)) },
             .BinaryOp => |op| {
                 return switch (op.op) {
-                    .START_PARSING => {
-                        std.debug.print("start parsing??", .{});
-                        return .{ .Number = 0 };
-                    },
-
                     .PLUS => .{ .Number = try self.expectNumber(op.lhs) + try self.expectNumber(op.rhs) },
                     .MINUS => .{ .Number = try self.expectNumber(op.lhs) - try self.expectNumber(op.rhs) },
                     .STAR => .{ .Number = try self.expectNumber(op.lhs) * try self.expectNumber(op.rhs) },
@@ -55,7 +55,9 @@ pub const Executor = struct {
                     .EQUAL => .{ .Boolean = try self.expectNumber(op.lhs) == try self.expectNumber(op.rhs) },
                     .NOT_EQUAL => .{ .Boolean = try self.expectNumber(op.lhs) != try self.expectNumber(op.rhs) },
 
-                    else => .{ .String = "unknown op" },
+                    .START_PARSING => unreachable,
+
+                    else => RuntimeError.UnknownOp,
                 };
             },
 
@@ -64,22 +66,21 @@ pub const Executor = struct {
                     .Boolean => |boolean| self.executeExpr(if (boolean) ternary.tru else ternary.fals),
 
                     else => |val| {
-                        std.debug.print("{s}", .{try val.toString(self.allocator)});
-                        return .{ .String = "error" };
+                        std.debug.print("Expected bool, got: {s}\n", .{try val.toString(self.allocator)});
+                        return RuntimeError.InvalidType;
                     },
                 };
             },
         }
     }
 
-    fn expectNumber(self: *Executor, node: *const Expr) std.fmt.AllocPrintError!f64 {
+    fn expectNumber(self: *Executor, node: *const Expr) RuntimeError!f64 {
         return switch (try self.executeExpr(node)) {
             .Number => |num| num,
 
             else => |val| {
-                std.debug.print("Expected number: {s}", .{try val.toString(self.allocator)});
-
-                return 0;
+                std.debug.print("Expected number, got: {s}\n", .{try val.toString(self.allocator)});
+                return RuntimeError.InvalidType;
             },
         };
     }
