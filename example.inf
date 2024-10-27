@@ -1,6 +1,0 @@
-fun add(a: number, b: number) number {
-    return a + b;
-}
-
-let c = add(12, 13);
-print(c); // 25

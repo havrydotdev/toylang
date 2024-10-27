@@ -1,9 +1,9 @@
 const std = @import("std");
 const Expr = @import("./ast.zig").Expr;
-const tokenizer = @import("./tokenizer.zig");
+const lexer = @import("./lexer.zig");
+const Token = @import("./Token.zig");
 const Allocator = std.mem.Allocator;
-const Token = tokenizer.Token;
-const OpType = tokenizer.OpType;
+const OpType = Token.OpType;
 
 pub const Parser = struct {
     allocator: Allocator,
@@ -37,6 +37,26 @@ pub const Parser = struct {
                 break :num expr;
             },
 
+            .Op => |op| op: {
+                if (op == .MINUS) {
+                    const curr = self.peek();
+                    if (curr.tag != .Number) {
+                        std.debug.print("Expected negative number, got {any}", .{token.tag});
+                        return ParserError.ParseFailed;
+                    }
+
+                    const expr: *Expr = try self.allocator.create(Expr);
+                    expr.* = .{ .Number = -curr.tag.Number.val };
+
+                    _ = self.next();
+
+                    break :op expr;
+                } else {
+                    std.debug.print("Unexpected identifier {any}", .{token.tag});
+                    return ParserError.ParseFailed;
+                }
+            },
+
             else => {
                 std.debug.print("Not a number?? {any}", .{token.tag});
                 return ParserError.ParseFailed;
@@ -56,14 +76,35 @@ pub const Parser = struct {
                         return result;
                     }
 
-                    _ = self.next();
+                    if (op == OpType.QUESTION_MARK) {
+                        _ = self.next();
 
-                    const active_precedence = precedence + 1;
-                    const rhs: *Expr = try self.parseExpr(active_precedence);
+                        const true_expr: *Expr = try self.parseExpr(@intFromEnum(OpType.START_PARSING));
 
-                    const old_result = result;
-                    result = try self.allocator.create(Expr);
-                    result.* = .{ .BinaryOp = .{ .op = op, .lhs = old_result, .rhs = rhs } };
+                        if (self.next().tag.Op != OpType.COLON) {
+                            std.debug.print("Expected colon\n", .{});
+                            return ParserError.ParseFailed;
+                        }
+
+                        const false_expr: *Expr = try self.parseExpr(@intFromEnum(OpType.START_PARSING));
+
+                        const old_result = result;
+                        result = try self.allocator.create(Expr);
+                        result.* = .{ .Ternary = .{
+                            .cond = old_result,
+                            .tru = true_expr,
+                            .fals = false_expr,
+                        } };
+                    } else {
+                        _ = self.next();
+
+                        const active_precedence = precedence + 1;
+                        const rhs: *Expr = try self.parseExpr(active_precedence);
+
+                        const old_result = result;
+                        result = try self.allocator.create(Expr);
+                        result.* = .{ .BinaryOp = .{ .op = op, .lhs = old_result, .rhs = rhs } };
+                    }
                 },
 
                 else => {
